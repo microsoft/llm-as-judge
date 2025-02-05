@@ -1,0 +1,72 @@
+[tool.poetry]
+name = "LLM As Judge"
+version = "0.1.0-alpha"
+description = ""
+authors = ["Pablo Castano <pablocastao@microsoft.com>", "Ricardo Cataldi <rcataldi@microsoft.com>"]
+readme = "README.md"
+packages = [{include = "app", from = "."}]
+
+[tool.poetry.dependencies]
+python = "^3.12, <4.0"
+fastapi = "^0.115.5"
+azure-storage-blob = "^12.24.0"
+azure-identity = "^1.19.0"
+azure-cosmos = "^4.9.0"
+semantic-kernel = "^1.20.0"
+uvicorn = "^0.32.1"
+typing-extensions = "^4.9.0"  # Ensures compatibility with TypeAlias in Python <3.10
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^3.0.3"
+astroid = "^3.0.3"
+black = {extras = ["jupyter"], version = "^24.4.2"}
+pytest = "^7.4.3"
+isort = "^5.13.2"
+pytest-asyncio = "^0.23.6"
+ipykernel = "^6.29.3"
+poetry-plugin-export = "^1.7.1"
+locust = "^2.31.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q -s"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "async: marks tests as async (select with '-m async')",
+    "slow: marks tests as slow (select with '-m slow')"
+]
+
+[tool.pylint]
+fail-under = 8.5
+max-line-length = 100
+max-complexity = 10
+good-names = ["i", "j", "k", "ex", "Run", "_"]
+disable = [
+    "C0114", "C0115", "C0116", "C0301",  # Docstrings & Line Length Warnings
+    "W3101",  # `confusing-with-statement` (False Positive)
+    "E0401"  # `import-error` (Fixes false positives on local imports)
+]
+load-plugins = [
+    "pylint.extensions.mccabe",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']  # Explicit Python 3.12 support
+include = '\.pyi?$'
+exclude = '\.git|\.hg|\.mypy_cache|\.tox|\.venv|_build|buck-out|build|dist'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 100
