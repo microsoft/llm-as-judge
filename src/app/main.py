@@ -36,29 +36,29 @@ logger.setLevel(logging.WARNING)
 
 tags_metadata: list[dict] = [
     {
-        "name": "Clients",
+        "name": "Management",
         "description": """
-        Endpoints for managing clients.
+        Endpoints for managing the application and including eventual data for operation.
         """,
     },
     {
-        "name": "Emails",
+        "name": "Judge Configuration",
         "description": """
-        Endpoints to manage e-mail templates.
+        Endpoints that allow the creation of agents, so the execution is stateless.
         """,
     },
     {
-        "name": "Campaigns",
+        "name": "Judge Execution",
         "description": """
-        Endpoints to Manage Campaigns.
+        Endpoints to execute or trigger the judge evaluation.
         """,
     },
 ]
 
 description: str = """
-    Web API to manage transcription evaluation jobs from a Call Center.\n
-    Leveraging Azure OpenAI, this engine provides interfaces and engines for evaluating transcriptions against
-    aghnostic criterias. It also provides interfaces for improving existing transcriptions.
+Web Service that manages the implementation of a full-fledged LLM as a Judge pattern. On this Pattern, the LLM is responsible for implementing custom evaluations
+of tasks, and the orchestration of the LLM is done by a set of agents that are responsible for executing the tasks.
+The service is responsible for managing the agents and the orchestration of the LLM, so it can be used as a standalone service or as a part of a larger system.
 """
 
 
@@ -76,7 +76,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 
@@ -136,7 +136,7 @@ async def response_exception_handler(
     )
 
 
-@app.get("/list-judges", tags=["Judges"])
+@app.get("/list-judges", tags=["Judge Configuration"])
 async def list_judges(name: Optional[str] = None, email: Optional[str] = None) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as client:
@@ -166,7 +166,7 @@ async def list_judges(name: Optional[str] = None, email: Optional[str] = None) -
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.post("/create-judge", tags=["Judges"])
+@app.post("/create-judge", tags=["Judge Configuration"])
 async def create_judge(judge: Judge) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -185,7 +185,7 @@ async def create_judge(judge: Judge) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.put("/update-judge/{judge_id}", tags=["Judges"])
+@app.put("/update-judge/{judge_id}", tags=["Judge Configuration"])
 async def update_judge(judge_id: str, judge: Judge) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -212,7 +212,7 @@ async def update_judge(judge_id: str, judge: Judge) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.delete("/delete-judge/{judge_id}", tags=["Judge"])
+@app.delete("/delete-judge/{judge_id}", tags=["Judge Configuration"])
 async def delete_judge(judge_id: str) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -236,7 +236,7 @@ async def delete_judge(judge_id: str) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.get("/list-assemblies", tags=["Assembly"])
+@app.get("/list-assemblies", tags=["Judge Configuration"])
 async def list_assemblies(role: Optional[str] = None) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as client:
@@ -262,7 +262,7 @@ async def list_assemblies(role: Optional[str] = None) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.post("/create-assembly", tags=["Assembly"])
+@app.post("/create-assembly", tags=["Judge Configuration"])
 async def create_assembly(assembly: Assembly) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -281,7 +281,7 @@ async def create_assembly(assembly: Assembly) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.put("/update-assembly/{assembly_id}", tags=["Assembly"])
+@app.put("/update-assembly/{assembly_id}", tags=["Judge Configuration"])
 async def update_assembly(assembly_id: str, assembly: Assembly) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -310,7 +310,7 @@ async def update_assembly(assembly_id: str, assembly: Assembly) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.delete("/delete-assembly/{assembly_id}", tags=["Assembly"])
+@app.delete("/delete-assembly/{assembly_id}", tags=["Judge Configuration"])
 async def delete_email(assembly_id: str) -> JSONResponse:
     """ """
     async with CosmosClient(COSMOS_ENDPOINT, DefaultAzureCredential()) as cosmos_client:
@@ -334,7 +334,7 @@ async def delete_email(assembly_id: str) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
-@app.post("/evaluate", tags=["Judges", "Assembly"])
+@app.post("/evaluate", tags=["Judge Execution"])
 async def evaluate_judgment(evaluation: JudgeEvaluation) -> JSONResponse:
     """
     Endpoint that evaluates a prompt using a Judge Assembly.
@@ -349,15 +349,12 @@ async def evaluate_judgment(evaluation: JudgeEvaluation) -> JSONResponse:
            - Run the evaluation (the SuperJudge invokes its plan to run all sub-judges).
       4. Return the final aggregated verdict as a JSON response.
     """
-    # 1. Retrieve the assembly document
     assembly_doc = await fetch_assembly(evaluation.id)
     if not assembly_doc:
         raise HTTPException(status_code=404, detail=f"Assembly '{evaluation.id}' not found.")
 
-    # 2. Convert to a Pydantic Assembly model
     assembly = Assembly(**assembly_doc)
 
-    # 3. Run the evaluation using the orchestrator
     try:
         final_verdict = await JudgeOrchestrator.run_evaluation(assembly, evaluation.prompt)
     except Exception as ex:

@@ -52,11 +52,6 @@ COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "https://myendpoint.documents.azu
 COSMOS_ASSEMBLY_TABLE = os.getenv("COSMOS_ASSEMBLY_TABLE", "assemblies")
 
 
-# =============================================================================
-# 1. The MEdiator, which implements the notify method
-# =============================================================================
-
-
 class Mediator(ABC):
     """
     The Mediator interface declares the notify method used by judges (agents)
@@ -74,11 +69,6 @@ class Mediator(ABC):
         :param data: A dictionary containing additional data (e.g., judge_id, result).
         """
         pass
-
-
-# =============================================================================
-# 2. Abstract Judge
-# =============================================================================
 
 
 class JudgeBase(ABC):
@@ -100,11 +90,6 @@ class JudgeBase(ABC):
         pass
 
 
-# =============================================================================
-# 3. Concrete Judge (Agent)
-# =============================================================================
-
-
 class ConcreteJudge(JudgeBase):
     """
     A judge that uses a ChatCompletionAgent to evaluate a prompt.
@@ -121,7 +106,7 @@ class ConcreteJudge(JudgeBase):
         Use ChatCompletionAgent to evaluate the prompt. Once done,
         notify the mediator with the result.
         """
-        # 1) Parse the metaprompt
+
         try:
             meta = json.loads(self.judge_data.metaprompt)  # e.g. {"text": "..."}
         except json.JSONDecodeError as e:
@@ -129,7 +114,6 @@ class ConcreteJudge(JudgeBase):
 
         system_text = meta.get("text", "System Prompt Missing")
 
-        # 2) Retrieve execution settings from the kernel (or fallback to "default")
         settings = self.kernel.get_prompt_execution_settings_from_service_id(
             service_id=str(self.judge_data.model)
         )
@@ -138,7 +122,6 @@ class ConcreteJudge(JudgeBase):
 
         settings.function_choice_behavior = FunctionChoiceBehavior.Auto()
 
-        # 3) Build the agent
         agent = ChatCompletionAgent(
             service_id=str(self.judge_data.model) or "default",
             kernel=self.kernel,
@@ -174,11 +157,6 @@ class ConcreteJudge(JudgeBase):
                     "result": result_str,
                 },
             )
-
-
-# =============================================================================
-# 4. SuperJudge (also a Judge, plus Mediator-like behavior)
-# =============================================================================
 
 
 class SuperJudge(JudgeBase, Mediator):
@@ -235,11 +213,6 @@ class SuperJudge(JudgeBase, Mediator):
         await plan.run_plan()
 
 
-# =============================================================================
-# 4. A Plan for the SuperJudge
-# =============================================================================
-
-
 class JudgeEvaluationPlan(Plan):
     """
     A semantic-kernel Plan describing how the SuperJudge calls each sub-judge.
@@ -270,11 +243,6 @@ class JudgeEvaluationPlan(Plan):
         return self.super_judge.final_verdict()
 
 
-# =============================================================================
-# 5. Factory
-# =============================================================================
-
-
 class JudgeFactory:
     """
     Builds a kernel (optional) and produces sub-judges.
@@ -299,11 +267,6 @@ class JudgeFactory:
         Each judge uses the provided kernel for its ChatCompletionAgent.
         """
         return [ConcreteJudge(judge_data=jd, kernel=kernel) for jd in assembly.judges]
-
-
-# =============================================================================
-# 6. Orchestration Class (Merges SuperJudge + Factory in a single procedure)
-# =============================================================================
 
 
 class JudgeOrchestrator:

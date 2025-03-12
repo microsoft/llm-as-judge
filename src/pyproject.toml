@@ -15,6 +15,8 @@ azure-cosmos = "^4.9.0"
 semantic-kernel = "^1.20.0"
 uvicorn = "^0.32.1"
 typing-extensions = "^4.9.0"  # Ensures compatibility with TypeAlias in Python <3.10
+scipy = "^1.15.2"
+kaggle = "^1.7.4"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.0.3"

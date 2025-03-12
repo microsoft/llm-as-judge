@@ -29,12 +29,23 @@ What kind of change does this Pull Request introduce?
 git clone [repo-address]
 cd [repo-name]
 git checkout [branch-name]
-npm install
+.py-conf/conf-env.ps1
 ```
 
 * Test the code
-<!-- Add steps to run the tests suite and/or manually test -->
+
+Clone the Repo
+
 ```
+git clone [repo-address]
+cd [repo-name]
+git checkout [branch-name]
+```
+
+Check the linting with proper profiling:
+
+```
+.py-conf/linters.ps1
 ```
 
 ## What to Check
