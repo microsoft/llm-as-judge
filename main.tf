@@ -12,6 +12,11 @@ terraform {
   }
 }
 
+variable "subscription_id" {
+  description = "The Azure subscription ID to use for the provider."
+  type        = string
+}
+
 provider "azurerm" {
   features {
     resource_group {
@@ -22,6 +27,7 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
   }
+  subscription_id = var.subscription_id
 }
 
 module "naming" {
@@ -30,7 +36,7 @@ module "naming" {
 }
 
 resource "azurerm_resource_group" "llm_as_judge" {
-  name     = "LLM-As-Judge"
+  name     = "model-as-a-judge"
   location = "East US"
 }
 
@@ -41,17 +47,8 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-module "openai" {
-    source = "Azure/openai/azurerm"
-    version = "0.1.5"
-
-    resource_group_name = azurerm_resource_group.llm_as_judge.name
-    location = azurerm_resource_group.llm_as_judge.location
-    account_name = "exampleopenaiaccount"
-}
-
 resource "azurerm_container_registry" "acr" {
-  name                = "judgescontainers"
+  name                = "judges-registry-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
   sku                 = "Basic"
@@ -59,7 +56,7 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_cosmosdb_account" "cosmosdb" {
-  name                = "judge-container"
+  name                = "judges-databases-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
   offer_type          = "Standard"
@@ -77,6 +74,7 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
   network_acl_bypass_for_azure_services = false
 }
 
+
 resource "azurerm_storage_account" "storage" {
   name                     = "judgesfiles"
   resource_group_name      = azurerm_resource_group.llm_as_judge.name
@@ -85,41 +83,45 @@ resource "azurerm_storage_account" "storage" {
   account_replication_type = "LRS"
 }
 
-resource "openai" "azure_openai" {
-  name                = "judges-models"
+resource "azurerm_cognitive_account" "openai" {
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
-  sku                 = "S0"
+  name                = "judges-openai-${random_string.suffix.result}"
+  kind                = "OpenAI"
+  sku_name            = "S0"
 }
 
 resource "azurerm_cognitive_account" "speech" {
-  name                = "judges-speech-tools"
+  name                = "judges-speech-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
   kind                = "SpeechServices"
-  sku_name            = "S0"
+  sku_name            = "S1"
 }
 
 resource "azurerm_cognitive_account" "vision" {
-  name                = "judges-vision-tools"
+  name                = "judges-vision-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
   kind                = "ComputerVision"
-  sku_name            = "S0"
+  sku_name            = "S1"
 }
 
 resource "azurerm_container_app_environment" "env" {
-  name                = "judges-containers-env"
+  name                = "judges-apps-environment-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.llm_as_judge.name
   location            = azurerm_resource_group.llm_as_judge.location
 }
 
 resource "azurerm_container_app" "app" {
-  name                = "judges-containers"
-  resource_group_name = azurerm_resource_group.llm_as_judge.name
-  location            = azurerm_resource_group.llm_as_judge.location
+  name                         = "judges-apps-${random_string.suffix.result}"
+  resource_group_name          = azurerm_resource_group.llm_as_judge.name
   container_app_environment_id = azurerm_container_app_environment.env.id
-  revision_mode       = "Single"
+  revision_mode                = "Single"
+
+  identity {
+    type = "SystemAssigned"
+  }
 
   template {
     container {
@@ -138,15 +140,15 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "COSMOS_KEY"
-        value = azurerm_cosmosdb_account.cosmosdb.primary_master_key
+        value = azurerm_cosmosdb_account.cosmosdb.primary_key
       }
       env {
         name  = "GPT4_KEY"
-        value = azurerm_openai.openai.primary_key
+        value = azurerm_cognitive_account.openai.primary_access_key
       }
       env {
         name  = "GPT4_URL"
-        value = azurerm_openai.openai.endpoint
+        value = azurerm_cognitive_account.openai.endpoint
       }
       env {
         name  = "AI_SPEECH_URL"
@@ -162,7 +164,7 @@ resource "azurerm_container_app" "app" {
 
 resource "null_resource" "upload_image" {
   provisioner "local-exec" {
-    command = ".py-conf/conf-image.ps1 -gitRepositoryAddress ${path.module} -imageRepositoryName ${azurerm_container_registry.acr.name} -imageName judge-container"
+    command = "powershell.exe -ExecutionPolicy Bypass -File \"${path.module}/configuration/conf-image.ps1\" -gitRepositoryAddress \"${path.module}\" -imageRepositoryName \"${azurerm_container_registry.acr.name}\" -imageName \"judge-container\""
   }
   depends_on = [azurerm_container_registry.acr]
 }

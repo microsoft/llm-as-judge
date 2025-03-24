@@ -939,6 +939,5 @@ __azurite_db*__.json
 *.tfstate
 *.tfstate.*
 *.tfvars
-*.tfvars.*
 *.tfplan
 *.tfplan.*
